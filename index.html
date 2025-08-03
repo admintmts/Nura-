@@ -1,82 +1,925 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Chatbot Suara Gemini</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #f3f3f3;
-      padding: 10px;
-      text-align: center;
-    }
-    #chatbox {
-      background: white;
-      border-radius: 10px;
-      padding: 10px;
-      max-width: 400px;
-      margin: auto;
-      box-shadow: 0 0 10px rgba(0,0,0,0.1);
-    }
-    button {
-      padding: 10px 20px;
-      margin: 5px;
-      border: none;
-      border-radius: 5px;
-      background: #007bff;
-      color: white;
-      cursor: pointer;
-    }
-    button:hover {
-      background: #0056b3;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <!-- Penting: viewport-fit=cover untuk iOS dan penanganan keyboard. interactive-widget=overlays-content bisa membantu. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=overlays-content">
+    <title>Nura - Teman Belajar Santri Mts PERSIS</title>
+    <!-- Tailwind CSS untuk styling yang mudah dan responsif -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        
+        /* Pastikan html dan body mengambil tinggi penuh viewport */
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden; /* Mencegah body scroll, biarkan chat-container yang mengatur scroll. */
+            font-family: 'Inter', sans-serif;
+            background-color: #f0fdf4; /* Pale green background */
+        }
+        
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 5px; /* Padding minimal agar chat container tidak menempel di tepi */
+            box-sizing: border-box; /* Pastikan padding dihitung dalam tinggi */
+            height: 100%; /* Pastikan body mengambil tinggi penuh dari html */
+        }
+        
+        .chat-container {
+            background-color: #ffffff;
+            border-radius: 1rem; /* Rounded corners */
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 500px; /* Lebar maksimal */
+            display: flex;
+            flex-direction: column;
+            overflow: hidden; /* Sembunyikan overflow di chat container */
+            
+            /* Penting: Tinggi awal akan diatur oleh JavaScript menggunakan visualViewport */
+            height: calc(100vh - 10px); /* Default height untuk desktop/tanpa keyboard */
+            transition: height 0.1s ease-out; /* Transisi halus saat tinggi berubah */
+        }
+        
+        .chat-header {
+            background-color: #059669; /* Emerald 600 - Dark Green */
+            color: white;
+            padding: 1.25rem;
+            text-align: center;
+            font-size: 1.25rem;
+            font-weight: bold;
+            border-top-left-radius: 1rem;
+            border-top-right-radius: 1rem;
+            flex-shrink: 0; /* Pastikan header tidak mengecil */
+        }
+        
+        .chat-messages {
+            flex-grow: 1; /* Penting: Biarkan area pesan membesar/mengecil */
+            padding: 1rem;
+            overflow-y: auto; /* Aktifkan scroll di area pesan */
+            background-color: #f8fafc; /* Light gray background */
+        }
+        
+        .message {
+            margin-bottom: 0.75rem;
+            padding: 0.75rem 1rem;
+            border-radius: 0.75rem;
+            max-width: 85%;
+            word-wrap: break-word;
+        }
+        
+        .message.user {
+            background-color: #d1fae5; /* Emerald 100 - Light green */
+            margin-left: auto;
+            text-align: right;
+            color: #065f46;
+        }
+        
+        .message.bot {
+            background-color: #ecfdf5; /* Emerald 50 - Lighter pale green */
+            margin-right: auto;
+            text-align: left;
+            color: #047857;
+        }
+        
+        .message img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 0.5rem;
+            margin-top: 0.5rem;
+        }
+        
+        .chat-input-container {
+            display: flex;
+            align-items: flex-end;
+            padding: 0.75rem;
+            border-top: 1px solid #e2e8f0;
+            background-color: #ffffff;
+            border-bottom-left-radius: 1rem;
+            border-bottom-right-radius: 1rem;
+            gap: 0.5rem;
+            position: relative; /* Untuk menu plus */
+            flex-shrink: 0; /* Penting: Pastikan container input tidak mengecil */
+            z-index: 100; /* Pastikan di atas elemen lain */
+        }
+        
+        .chat-input {
+            flex-grow: 1;
+            padding: 0.6rem 0.8rem;
+            border: 1px solid #cbd5e1;
+            border-radius: 1.5rem;
+            font-size: 0.95rem;
+            outline: none;
+            min-height: 40px;
+            max-height: 120px;
+            resize: none;
+            overflow-y: auto;
+            line-height: 1.3;
+        }
+        
+        .chat-input:focus {
+            border-color: #059669;
+            box-shadow: 0 0 0 2px rgba(5, 150, 105, 0.2);
+        }
+        
+        .send-button, .action-button {
+            background-color: #059669;
+            color: white;
+            padding: 0.75rem;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 1.2rem;
+            font-weight: bold;
+            transition: background-color 0.2s ease, transform 0.1s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            width: 44px;
+            height: 44px;
+        }
+        
+        .send-button:hover, .action-button:hover {
+            background-color: #047857;
+            transform: scale(1.05);
+        }
+        
+        .send-button:disabled, .action-button:disabled {
+            background-color: #9ca3af;
+            cursor: not-allowed;
+            transform: none;
+        }
+        /* Typing indicator animation */
+        .typing-indicator {
+            display: flex;
+            justify-content: flex-start;
+            align-items: center;
+            padding: 0.5rem 1rem;
+            color: #64748b;
+            font-style: italic;
+            flex-shrink: 0;
+        }
+        .typing-indicator span {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background-color: #64748b;
+            border-radius: 50%;
+            margin: 0 2px;
+            animation: bounce 1s infinite alternate;
+            opacity: 0;
+        }
+        .typing-indicator span:nth-child(1) { animation-delay: 0s; }
+        .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+        .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes bounce {
+            0% { transform: translateY(0); opacity: 0.3; }
+            50% { transform: translateY(-5px); opacity: 1; }
+            100% { transform: translateY(0); opacity: 0.3; }
+        }
+        .notification-box {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #ef4444;
+            color: white;
+            padding: 1rem 1.5rem;
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s ease-in-out;
+            text-align: center;
+        }
+        .notification-box.show {
+            opacity: 1;
+        }
+        /* Style for voice recording active state */
+        .action-button.recording {
+            background-color: #ef4444;
+            animation: pulse-red 1.5s infinite;
+        }
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+        /* Plus button menu */
+        .plus-menu {
+            position: absolute;
+            bottom: calc(100% + 10px);
+            left: 10px;
+            background-color: #ffffff;
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+            overflow: hidden;
+            z-index: 50;
+            opacity: 0;
+            transform: translateY(10px);
+            transition: opacity 0.2s ease-out, transform 0.2s ease-out;
+            pointer-events: none;
+            min-width: 150px;
+        }
+        .plus-menu.show {
+            opacity: 1;
+            transform: translateY(0);
+            pointer-events: auto;
+        }
+        .plus-menu-item {
+            display: flex;
+            align-items: center;
+            padding: 0.75rem 1rem;
+            color: #333;
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: background-color 0.15s ease;
+        }
+        .plus-menu-item:hover {
+            background-color: #f0fdf4;
+        }
+        .plus-menu-item:not(:last-child) {
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .plus-menu-item span {
+            margin-right: 0.75rem;
+            font-size: 1.1rem;
+        }
+        /* Interactive Question Styles */
+        .message.question {
+            background-color: #e0f2fe;
+            border-left: 4px solid #38bdf8;
+            color: #0c4a6e;
+        }
+        .question-options {
+            margin-top: 0.75rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        .question-option {
+            background-color: #f0f9ff;
+            border: 1px solid #93c5fd;
+            padding: 0.6rem 1rem;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+            font-size: 0.9rem;
+        }
+        .question-option:hover {
+            background-color: #e0f2fe;
+        }
+        .question-option.selected {
+            background-color: #bfdbfe;
+            border-color: #3b82f6;
+        }
+        .question-option.correct {
+            background-color: #d1fae5;
+            border-color: #10b981;
+            color: #065f46;
+        }
+        .question-option.incorrect {
+            background-color: #fee2e2;
+            border-color: #ef4444;
+            color: #991b1b;
+        }
+        .question-submit-button {
+            margin-top: 0.75rem;
+            background-color: #059669;
+            color: white;
+            padding: 0.75rem 1rem;
+            border-radius: 0.5rem;
+            border: none;
+            cursor: pointer;
+            width: 100%;
+            font-weight: bold;
+            transition: background-color 0.2s ease;
+        }
+        .question-submit-button:hover:not(:disabled) {
+            background-color: #047857;
+        }
+        .question-submit-button:disabled {
+            background-color: #9ca3af;
+            cursor: not-allowed;
+        }
+        .question-feedback {
+            margin-top: 0.5rem;
+            padding: 0.5rem 0;
+            font-style: italic;
+            font-size: 0.85rem;
+            color: #4b5563;
+        }
+        /* New styles for better message formatting */
+        .message.bot ul, .message.bot ol {
+            margin: 0.5rem 0;
+            padding-left: 1.5rem;
+        }
+        .message.bot li {
+            margin-bottom: 0.3rem;
+        }
+        .message.bot p {
+            margin-bottom: 0.75rem;
+        }
+    </style>
 </head>
 <body>
-  <div id="chatbox">
-    <h2>Chatbot Suara Gemini</h2>
-    <div id="output">Klik 🎤 untuk bicara</div>
-    <button id="speak">🎤 Bicara</button>
-  </div>
+    <div class="chat-container">
+        <div class="chat-header">
+            Nura: Teman Belajar Santri Mts PERSIS
+        </div>
+        <div class="chat-messages" id="chat-messages">
+            <!-- Salam pembuka dari Nura -->
+            <div class="message bot">
+                Assalamu'alaikum! 🌟 Hi Santri Mts PERSIS, Aku Nura, teman belajarmu yang insyaAllah selalu siap membantu.<br><br>
+                Apa kamu sedang ingin belajar sesuatu? Silakan tanya aku tentang materi pelajaran yang kamu belum pahami di kelas.<br>
+                Yuk, belajar sambil menjemput berkah ilmu! 😊
+            </div>
+        </div>
+        <div class="typing-indicator" id="typing-indicator" style="display: none;">
+            <span></span><span></span><span></span>
+        </div>
+        <div class="chat-input-container">
+            <button id="plus-button" class="action-button">+</button>
+            <input type="file" id="image-upload" accept="image/*" class="hidden">
+            <textarea id="user-input" class="chat-input" placeholder="Ketik pesan atau tanya aku..." rows="1"></textarea>
+            <button id="send-button" class="send-button">🚀</button>
+            
+            <div id="plus-menu" class="plus-menu">
+                <div class="plus-menu-item" id="menu-photo">
+                    <span>📸</span> Ambil Foto
+                </div>
+                <div class="plus-menu-item" id="menu-gallery">
+                    <span>🏞️</span> Pilih dari Galeri
+                </div>
+                <div class="plus-menu-item" id="menu-mic">
+                    <span>🎤</span> Kirim Pesan Suara
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="notification-box" class="notification-box"></div>
+    <script type="module">
+        // Mendapatkan referensi elemen HTML
+        const chatContainer = document.querySelector('.chat-container');
+        const chatHeader = document.querySelector('.chat-header');
+        const chatMessages = document.getElementById('chat-messages');
+        const chatInputContainer = document.querySelector('.chat-input-container');
+        const userInput = document.getElementById('user-input');
+        const sendButton = document.getElementById('send-button');
+        const typingIndicator = document.getElementById('typing-indicator');
+        const notificationBox = document.getElementById('notification-box');
+        const plusButton = document.getElementById('plus-button');
+        const plusMenu = document.getElementById('plus-menu');
+        const menuPhoto = document.getElementById('menu-photo');
+        const menuGallery = document.getElementById('menu-gallery');
+        const menuMic = document.getElementById('menu-mic');
+        const imageUpload = document.getElementById('image-upload');
+        let uploadedImage = null; // Menyimpan data gambar yang diunggah
+        let recognition = null; // Objek SpeechRecognition
+        let isRecording = false; // Status rekaman suara
+        let studentName = localStorage.getItem('studentName') || null; // Ambil nama dari localStorage
 
-  <script>
-    const GEMINI_API_KEY = "AIzaSyBAzvmhfznbnJ0XmW622EszTNR4YNnm7mQ";
-    const output = document.getElementById('output');
-    const recognition = new(window.SpeechRecognition || window.webkitSpeechRecognition)();
-    recognition.lang = 'id-ID';
+        // History obrolan untuk dikirim ke API
+        // Penting: chatHistory ini hanya akan menyimpan TEKS dari percakapan.
+        // Data gambar akan ditambahkan secara dinamis HANYA saat request API dilakukan.
+        let chatHistory = [{
+            role: "user",
+            parts: [{ text: `Kamu adalah *chatbot* pendidikan bernama Nura untuk siswa Madrasah Tsanawiyah (Mts) PERSIS kelas 7-9. Jawablah pertanyaan mereka dengan bahasa yang ramah, *gaul*, mudah dimengerti, dan tetap mengedepankan etika. Fokus pada mata pelajaran umum.
 
-    document.getElementById('speak').onclick = () => {
-      recognition.start();
-    };
-
-    recognition.onresult = async (event) => {
-      const userText = event.results[0][0].transcript;
-      output.innerHTML = "Kamu: " + userText;
-
-      // Kirim ke Gemini API
-      const botReply = await getGeminiResponse(userText);
-      output.innerHTML += "<br>Bot: " + botReply;
-
-      // Balas dengan suara
-      const utter = new SpeechSynthesisUtterance(botReply);
-      speechSynthesis.speak(utter);
-    };
-
-    async function getGeminiResponse(prompt) {
-      const response = await fetch(
-        "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=" + GEMINI_API_KEY,
+            Aturan sapaan untuk SEMUA RESPON setelah salam pembuka pertama di awal chat:
+            
+            - Jika nama siswa sudah diketahui (saat ini nama siswa adalah ${studentName || 'belum diketahui'}), gunakan sapaan personal seperti 'Hi ${studentName}!' atau 'Assalamu\'alaikum, ${studentName}!' di awal responsmu.
+            
+            - Jika nama siswa belum diketahui, gunakan sapaan umum seperti 'Santri Mts PERSIS!' atau 'Sahabat ilmu!' atau 'Adik-adik!' di awal responsmu.
+            
+            - Jika ada pertanyaan di luar topik, sampaikan dengan sopan bahwa kamu hanya bisa membantu masalah pelajaran.
+            
+            Contoh bahasa *gaul*:'Woy, keren banget!', 'Mantap jiwa!', 'Bikin ngakak.', 'Santuy.' Gunakan emoji yang sesuai.
+            
+            FORMAT RESPON:
+            - Gunakan paragraf pendek (maksimal 3 kalimat per paragraf)
+            - Jika menjelaskan poin-poin, gunakan format list (bullet atau numbering)
+            - Setiap poin dalam list harus dalam baris baru
+            - Beri jarak antara paragraf dan list
+            - Format khusus untuk respon gambar:
+              * Beri judul singkat tentang gambar
+              * Deskripsikan isi gambar secara detail
+              * Berikan analisis atau penjelasan terkait materi pelajaran
+              * Sertakan pertanyaan pemantik untuk diskusi` }]
+        },
         {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{ role: "user", parts: [{ text: prompt }] }]
-          }),
+            role: "model",
+            parts: [{ text: `Assalamu'alaikum! 🌟 Hi Santri Mts PERSIS, Aku Nura, teman belajarmu yang insyaAllah selalu siap membantu.<br><br>
+                Apa kamu sedang ingin belajar sesuatu? Silakan tanya aku tentang materi pelajaran yang kamu belum pahami di kelas.<br>
+                Yuk, belajar sambil menjemput berkah ilmu! 😊` }]
+        }];
+
+        // Fungsi untuk memformat teks respons menjadi lebih terstruktur
+        function formatResponseText(text) {
+            // Format bullet points
+            text = text.replace(/(\n\s*[-•])\s+/g, "$1 "); // Standarisasi bullet
+            text = text.replace(/(\n\s*[-•]\s.+)/g, "<ul><li>$1</li></ul>"); // Convert bullets to HTML
+            text = text.replace(/<\/ul><ul>/g, ""); // Gabungkan list yang terpisah
+            
+            // Format numbering
+            text = text.replace(/(\n\s*\d+\.)\s+/g, "$1 "); // Standarisasi numbering
+            text = text.replace(/(\n\s*\d+\.\s.+)/g, "<ol><li>$1</li></ol>"); // Convert numbers to HTML
+            text = text.replace(/<\/ol><ol>/g, ""); // Gabungkan list yang terpisah
+            
+            // Format paragraf
+            text = text.replace(/(\n\n)/g, "</p><p>"); // Double newline menjadi paragraf baru
+            text = "<p>" + text + "</p>"; // Wrap seluruh teks dalam paragraf
+            
+            // Bersihkan format yang tidak perlu
+            text = text.replace(/<p><\/p>/g, ""); // Hapus paragraf kosong
+            text = text.replace(/<p><(ul|ol)>/g, "<$1><p>"); // Perbaiki posisi paragraf sebelum list
+            text = text.replace(/<\/(ul|ol)><\/p>/g, "</$1>"); // Perbaiki penutup list
+            
+            return text;
         }
-      );
-      const data = await response.json();
-      return data.candidates?.[0]?.content?.parts?.[0]?.text || "Maaf, saya tidak mengerti.";
-    }
-  </script>
+
+        // Fungsi untuk menambahkan pesan ke antarmuka chat
+        function addMessage(sender, text, imageSrc = null) {
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('message', sender);
+            
+            if (text) {
+                // Format teks untuk struktur yang lebih baik
+                const formattedText = formatResponseText(text);
+                messageDiv.innerHTML = formattedText
+                    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                    .replace(/\*(.*?)\*/g, '<em>$1</em>');
+            }
+            
+            if (imageSrc) {
+                const img = document.createElement('img');
+                img.src = imageSrc;
+                img.classList.add('mt-2', 'rounded-lg', 'max-w-full', 'h-auto', 'object-cover');
+                messageDiv.appendChild(img);
+            }
+            
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        // Fungsi untuk menampilkan soal interaktif
+        function addInteractiveQuestion(questionData) {
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('message', 'bot', 'question');
+            messageDiv.innerHTML = `<p class="font-semibold mb-2">${questionData.question}</p>`;
+            
+            const optionsContainer = document.createElement('div');
+            optionsContainer.classList.add('question-options');
+            
+            let selectedOptionIndex = -1;
+            questionData.options.forEach((optionText, index) => {
+                const optionDiv = document.createElement('div');
+                optionDiv.classList.add('question-option');
+                optionDiv.textContent = `${String.fromCharCode(65 + index)}. ${optionText}`;
+                optionDiv.dataset.index = index;
+                optionsContainer.appendChild(optionDiv);
+                
+                optionDiv.addEventListener('click', () => {
+                    optionsContainer.querySelectorAll('.question-option').forEach(opt => {
+                        opt.classList.remove('selected');
+                    });
+                    optionDiv.classList.add('selected');
+                    selectedOptionIndex = index;
+                });
+            });
+            
+            const submitButton = document.createElement('button');
+            submitButton.classList.add('question-submit-button');
+            submitButton.textContent = 'Jawab!';
+            
+            const feedbackDiv = document.createElement('div');
+            feedbackDiv.classList.add('question-feedback');
+            
+            submitButton.addEventListener('click', () => {
+                if (selectedOptionIndex === -1) {
+                    showNotification('Pilih salah satu jawaban dulu ya!');
+                    return;
+                }
+                
+                optionsContainer.querySelectorAll('.question-option').forEach(opt => {
+                    opt.style.pointerEvents = 'none';
+                });
+                
+                submitButton.disabled = true;
+                
+                if (selectedOptionIndex === questionData.correctAnswerIndex) {
+                    feedbackDiv.innerHTML = `<span style="color: #10b981;">🥳 Betul sekali! Mantap jiwa!</span><br>${questionData.explanation}`;
+                    optionsContainer.children[selectedOptionIndex].classList.add('correct');
+                } else {
+                    feedbackDiv.innerHTML = `<span style="color: #ef4444;">❌ Kurang tepat, Santri.</span> Jawaban yang benar adalah **${String.fromCharCode(65 + questionData.correctAnswerIndex)}**. ${questionData.explanation}`;
+                    optionsContainer.children[selectedOptionIndex].classList.add('incorrect');
+                    optionsContainer.children[questionData.correctAnswerIndex].classList.add('correct');
+                }
+                
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            });
+            
+            messageDiv.appendChild(optionsContainer);
+            messageDiv.appendChild(submitButton);
+            messageDiv.appendChild(feedbackDiv);
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        // Fungsi untuk menampilkan notifikasi error
+        function showNotification(message, duration = 3000) {
+            notificationBox.textContent = message;
+            notificationBox.classList.add('show');
+            setTimeout(() => {
+                notificationBox.classList.remove('show');
+            }, duration);
+        }
+
+        // Fungsi untuk mengirim pesan ke Gemini API dan mendapatkan respons
+        async function generateResponse(userText, imageData) {
+            // Tampilkan pesan pengguna di UI
+            if (userText) addMessage('user', userText);
+            if (imageData) {
+                addMessage('user', '', `data:${imageData.mimeType};base64,${imageData.data}`);
+                // Jika ada gambar, langsung kirim tanpa menunggu teks
+                userText = "Ini adalah gambar yang saya upload. Tolong berikan penjelasan detail tentang gambar ini.";
+            }
+            
+            // Kosongkan input dan nonaktifkan tombol
+            userInput.value = '';
+            userInput.style.height = 'auto';
+            sendButton.disabled = true;
+            plusButton.disabled = true;
+            typingIndicator.style.display = 'flex';
+
+            // Tambahkan pesan TEKS pengguna ke riwayat PERMANEN (gambar tidak disertakan di sini)
+            chatHistory.push({ role: "user", parts: [{ text: userText }] });
+
+            // Buat payload DINAMIS untuk permintaan API SAAT INI
+            const apiContents = JSON.parse(JSON.stringify(chatHistory));
+            
+            if (imageData && imageData.data && imageData.mimeType) {
+                // Tambahkan data gambar ke bagian 'parts' dari pesan pengguna terakhir
+                apiContents[apiContents.length - 1].parts.push({ inlineData: { mimeType: imageData.mimeType, data: imageData.data } });
+            }
+            
+            // Setelah gambar ditambahkan ke payload API saat ini, kosongkan variabel uploadedImage
+            uploadedImage = null; 
+            imageUpload.value = '';
+
+            // Periksa apakah pengguna meminta soal latihan
+            const lowerCaseUserText = userText ? userText.toLowerCase() : '';
+            let isQuestionRequest = false;
+            if (lowerCaseUserText.includes('soal latihan') || lowerCaseUserText.includes('soal interaktif') || lowerCaseUserText.includes('latihan soal')) {
+                isQuestionRequest = true;
+            }
+
+            const payload = {
+                contents: apiContents,
+            };
+
+            // Jika meminta soal latihan, tambahkan generationConfig untuk schema JSON
+            if (isQuestionRequest) {
+                 payload.generationConfig = {
+                    responseMimeType: "application/json",
+                    responseSchema: {
+                        type: "OBJECT",
+                        properties: {
+                            "type": { "type": "STRING", "enum": ["question"] },
+                            "content": {
+                                "type": "OBJECT",
+                                "properties": {
+                                    "question": { "type": "STRING" },
+                                    "options": {
+                                        "type": "ARRAY",
+                                        "items": { "type": "STRING" }
+                                    },
+                                    "correctAnswerIndex": { "type": "NUMBER" },
+                                    "explanation": { "type": "STRING" }
+                                },
+                                "required": ["question", "options", "correctAnswerIndex"]
+                            }
+                        },
+                        "required": ["type", "content"]
+                    }
+                };
+            }
+
+            // Kunci API Anda sudah dimasukkan di sini!
+            const apiKey = "AIzaSyB5Nuxsb73mwL91Rgq7ypicnrsWKB4E4aw"; 
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    let errorData;
+                    try {
+                        errorData = await response.json();
+                    } catch (jsonError) {
+                        errorData = { message: await response.text() };
+                    }
+                    console.error('API Error:', response.status, response.statusText, errorData);
+                    showNotification(`Ups, Nura lagi ada kendala nih (${response.status}). Pesan error: ${errorData.error?.message || errorData.message || 'Error tidak diketahui'}. Ini mungkin masalah dengan Kunci API atau pembatasan domain (HTTP Referrer).`);
+                    chatHistory.pop();
+                    return;
+                }
+
+                const result = await response.json();
+                if (result.candidates && result.candidates.length > 0 &&
+                    result.candidates[0].content && result.candidates[0].content.parts &&
+                    result.candidates[0].content.parts.length > 0) {
+                    const responseText = result.candidates[0].content.parts[0].text;
+                    
+                    // Coba parse sebagai JSON untuk soal interaktif
+                    if (isQuestionRequest) {
+                        try {
+                            const parsedResponse = JSON.parse(responseText);
+                            if (parsedResponse.type === 'question' && parsedResponse.content) {
+                                addMessage('bot', "Siap! Yuk, kita coba latihan soal ini: 👇");
+                                addInteractiveQuestion(parsedResponse.content);
+                                chatHistory.push({ role: "model", parts: [{ text: JSON.stringify(parsedResponse) }] });
+                            } else {
+                                addMessage('bot', responseText);
+                                chatHistory.push({ role: "model", parts: [{ text: responseText }] });
+                            }
+                        } catch (e) {
+                            console.warn("Failed to parse response as JSON, treating as plain text:", e);
+                            addMessage('bot', responseText);
+                            chatHistory.push({ role: "model", parts: [{ text: responseText }] });
+                        }
+                    } else {
+                        // Regular text response
+                        addMessage('bot', responseText);
+                        chatHistory.push({ role: "model", parts: [{ text: responseText }] });
+                        
+                        // Logic to ask for name and update studentName
+                        if (chatHistory.length >= 2 && chatHistory[chatHistory.length - 2].parts[0].text.includes("boleh tahu nama kamu siapa")) {
+                            const potentialName = userText.split(' ')[0];
+                            if (potentialName.length > 1 && potentialName.length < 20 && /^[a-zA-Z]+$/.test(potentialName)) {
+                                studentName = potentialName;
+                                localStorage.setItem('studentName', studentName);
+                                chatHistory[0].parts[0].text = `Kamu adalah *chatbot* pendidikan bernama Nura untuk siswa Madrasah Tsanawiyah (Mts) PERSIS kelas 7-9. Jawablah pertanyaan mereka dengan bahasa yang ramah, *gaul*, mudah dimengerti, dan tetap mengedepankan etika. Fokus pada mata pelajaran umum.
+
+                                Aturan sapaan untuk SEMUA RESPON setelah salam pembuka pertama di awal chat:
+                                
+                                - Jika nama siswa sudah diketahui (saat ini nama siswa adalah ${studentName}), gunakan sapaan personal seperti 'Hi ${studentName}!' atau 'Assalamu\'alaikum, ${studentName}!' di awal responsmu.
+                                
+                                - Jika nama siswa belum diketahui, gunakan sapaan umum seperti 'Santri Mts PERSIS!' atau 'Sahabat ilmu!' atau 'Adik-adik!' di awal responsmu.
+                                
+                                - Jika ada pertanyaan di luar topik, sampaikan dengan sopan bahwa kamu hanya bisa membantu masalah pelajaran.
+                                
+                                Contoh bahasa *gaul*:'Woy, keren banget!', 'Mantap jiwa!', 'Bikin ngakak.', 'Santuy.' Gunakan emoji yang sesuai.
+                                
+                                FORMAT RESPON:
+                                - Gunakan paragraf pendek (maksimal 3 kalimat per paragraf)
+                                - Jika menjelaskan poin-poin, gunakan format list (bullet atau numbering)
+                                - Setiap poin dalam list harus dalam baris baru
+                                - Beri jarak antara paragraf dan list
+                                - Format khusus untuk respon gambar:
+                                  * Beri judul singkat tentang gambar
+                                  * Deskripsikan isi gambar secara detail
+                                  * Berikan analisis atau penjelasan terkait materi pelajaran
+                                  * Sertakan pertanyaan pemantik untuk diskusi`;
+                                
+                                addMessage('bot', `Keren! Makasih ya, ${studentName}! Nura seneng bisa kenalan sama kamu. Yuk, kita mulai belajar! 🚀`);
+                            }
+                        }
+                    }
+                } else {
+                    console.error('Unexpected API response structure:', result);
+                    showNotification('Maaf, Nura tidak bisa memberikan jawaban. Coba lagi ya! 🙏');
+                    chatHistory.pop();
+                }
+            } catch (error) {
+                console.error('Network or parsing error:', error);
+                showNotification(`Terjadi error jaringan atau pemrosesan: ${error.message}. Cek koneksi internetmu ya!`);
+                chatHistory.pop();
+            } finally {
+                sendButton.disabled = false;
+                plusButton.disabled = false;
+                typingIndicator.style.display = 'none';
+                userInput.focus();
+            }
+        }
+
+        // --- Event Listeners ---
+
+        // Event listener untuk tombol kirim
+        sendButton.addEventListener('click', () => {
+            const userText = userInput.value.trim();
+            if (userText || uploadedImage) {
+                generateResponse(userText, uploadedImage);
+            } else {
+                showNotification('Ketik pesan atau unggah gambar dulu ya! 😉');
+            }
+        });
+
+        // Event listener untuk tombol Enter di input
+        userInput.addEventListener('keypress', (event) => {
+            if (event.key === 'Enter' && !sendButton.disabled && !event.shiftKey) {
+                event.preventDefault();
+                const userText = userInput.value.trim();
+                if (userText || uploadedImage) {
+                    generateResponse(userText, uploadedImage);
+                } else {
+                    showNotification('Ketik pesan atau unggah gambar dulu ya! 😉');
+                }
+            }
+        });
+
+        // Auto-resize textarea
+        userInput.addEventListener('input', () => {
+            userInput.style.height = 'auto';
+            userInput.style.height = userInput.scrollHeight + 'px';
+        });
+
+        // --- Plus Button Menu ---
+        plusButton.addEventListener('click', (event) => {
+            event.stopPropagation();
+            plusMenu.classList.toggle('show');
+        });
+
+        // Close menu when clicking outside
+        document.addEventListener('click', (event) => {
+            if (!plusMenu.contains(event.target) && !plusButton.contains(event.target)) {
+                plusMenu.classList.remove('show');
+            }
+        });
+
+        menuPhoto.addEventListener('click', () => {
+            imageUpload.setAttribute('capture', 'environment');
+            imageUpload.click();
+            plusMenu.classList.remove('show');
+        });
+
+        menuGallery.addEventListener('click', () => {
+            imageUpload.removeAttribute('capture');
+            imageUpload.click();
+            plusMenu.classList.remove('show');
+        });
+
+        menuMic.addEventListener('click', () => {
+            if (isRecording) {
+                stopSpeechRecognition();
+            } else {
+                startSpeechRecognition();
+            }
+            plusMenu.classList.remove('show');
+        });
+
+        // Event listener saat file gambar dipilih
+        imageUpload.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                if (!file.type.startsWith('image/')) {
+                    showNotification('Hanya file gambar yang diizinkan!');
+                    uploadedImage = null;
+                    imageUpload.value = '';
+                    return;
+                }
+
+                if (file.size > 4 * 1024 * 1024) {
+                    showNotification('Gambar terlalu besar (maks 4MB). Coba gambar lain ya!');
+                    uploadedImage = null;
+                    imageUpload.value = '';
+                    return;
+                }
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    uploadedImage = {
+                        data: e.target.result.split(',')[1],
+                        mimeType: file.type
+                    };
+                    // Langsung kirim gambar tanpa perlu menekan tombol kirim
+                    generateResponse(null, uploadedImage);
+                };
+                reader.readAsDataURL(file);
+            } else {
+                uploadedImage = null;
+            }
+        });
+
+        // --- Speech Recognition ---
+        function startSpeechRecognition() {
+            if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+                showNotification('Maaf, browser Anda tidak mendukung input suara. Silakan coba browser lain seperti Chrome atau Edge.');
+                return;
+            }
+
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            recognition = new SpeechRecognition();
+            recognition.lang = 'id-ID';
+            recognition.interimResults = false;
+            recognition.maxAlternatives = 1;
+
+            recognition.onstart = () => {
+                isRecording = true;
+                plusButton.classList.add('recording');
+                userInput.placeholder = 'Nura mendengarkan...';
+                sendButton.disabled = true;
+                plusButton.disabled = false;
+                typingIndicator.textContent = 'Nura mendengarkan...';
+                typingIndicator.style.display = 'flex';
+                showNotification('Mulai bicara sekarang...', 2000);
+            };
+
+            recognition.onresult = (event) => {
+                const transcript = event.results[0][0].transcript;
+                userInput.value = transcript;
+                userInput.style.height = 'auto';
+                userInput.style.height = userInput.scrollHeight + 'px';
+                showNotification('Teks sudah masuk, siap dikirim! 👍', 2000);
+            };
+
+            recognition.onerror = (event) => {
+                console.error('Speech recognition error:', event.error);
+                let errorMessage = 'Terjadi error pada input suara.';
+                if (event.error === 'not-allowed') {
+                    errorMessage = 'Akses mikrofon ditolak. Mohon izinkan penggunaan mikrofon di pengaturan browser Anda.';
+                } else if (event.error === 'no-speech') {
+                    errorMessage = 'Tidak ada suara terdeteksi. Coba bicara lebih jelas atau dekatkan mikrofon.';
+                } else if (event.error === 'network') {
+                    errorMessage = 'Jaringan bermasalah, tidak bisa terhubung ke layanan suara.';
+                }
+                showNotification(errorMessage);
+            };
+
+            recognition.onend = () => {
+                isRecording = false;
+                plusButton.classList.remove('recording');
+                userInput.placeholder = 'Ketik pesan atau tanya aku...';
+                sendButton.disabled = false;
+                plusButton.disabled = false;
+                typingIndicator.style.display = 'none';
+                userInput.focus();
+            };
+
+            recognition.start();
+        }
+
+        function stopSpeechRecognition() {
+            if (recognition) {
+                recognition.stop();
+                recognition = null;
+                showNotification('Rekaman suara dihentikan. ✅', 1500);
+            }
+        }
+
+        // Fungsi untuk mengatur tinggi chat container agar pas di atas keyboard
+        function adjustChatContainerHeight() {
+            let viewportHeight = window.innerHeight;
+            if (window.visualViewport) {
+                viewportHeight = window.visualViewport.height;
+            }
+            
+            const newHeight = viewportHeight - 10;
+            chatContainer.style.height = `${newHeight}px`;
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        // Prompt Nura to ask for student's name if not known
+        if (!studentName) {
+            setTimeout(() => {
+                addMessage('bot', `Sebelum kita mulai, boleh tahu nama kamu siapa, Santri Mts PERSIS? Biar Nura bisa sapa lebih akrab 😉`);
+            }, 1500);
+        }
+
+        // Event listener untuk penyesuaian tinggi
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', adjustChatContainerHeight);
+        } else {
+            window.addEventListener('resize', adjustChatContainerHeight);
+        }
+
+        // Event listener saat input fokus atau blur
+        userInput.addEventListener('focus', () => {
+            setTimeout(() => {
+                adjustChatContainerHeight();
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }, 250);
+        });
+
+        userInput.addEventListener('blur', () => {
+            setTimeout(adjustChatContainerHeight, 250);
+        });
+
+        // Fokus ke input saat halaman dimuat dan atur tinggi awal
+        window.onload = () => {
+            userInput.focus();
+            userInput.style.height = 'auto';
+            userInput.style.height = userInput.scrollHeight + 'px';
+            adjustChatContainerHeight();
+        };
+    </script>
 </body>
 </html>
